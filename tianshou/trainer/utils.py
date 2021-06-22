@@ -23,7 +23,7 @@ def test_episode(
     policy.eval()
     if test_fn:
         test_fn(epoch, global_step)
-    result = collector.collect(n_episode=n_episode)
+    result = collector.collect(n_episode=1)
     if reward_metric:
         result["rews"] = reward_metric(result["rews"])
     if logger and global_step is not None:

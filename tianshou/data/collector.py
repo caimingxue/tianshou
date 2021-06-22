@@ -246,12 +246,11 @@ class Collector(object):
 
             # collect statistics
             step_count += len(ready_env_ids)
-
             if np.any(done):
                 env_ind_local = np.where(done)[0]
                 env_ind_global = ready_env_ids[env_ind_local]
                 episode_count += len(env_ind_local)
-                episode_lens.append(ep_len[env_ind_local])
+                episode_lens.append(ep_len[env_ind_local])#episode中包含的step的数量
                 episode_rews.append(ep_rew[env_ind_local])
                 episode_start_indices.append(ep_idx[env_ind_local])
                 # now we copy obs_next to obs, but since there might be

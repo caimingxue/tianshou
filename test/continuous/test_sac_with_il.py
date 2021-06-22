@@ -31,17 +31,17 @@ def get_args():
     parser.add_argument('--epoch', type=int, default=5)
     parser.add_argument('--step-per-epoch', type=int, default=24000)
     parser.add_argument('--il-step-per-epoch', type=int, default=500)
-    parser.add_argument('--step-per-collect', type=int, default=10)
+    parser.add_argument('--step-per-collect', type=int, default=240) # try to make it be the times of env.num
     parser.add_argument('--update-per-step', type=float, default=0.1)
     parser.add_argument('--batch-size', type=int, default=128)
     parser.add_argument('--hidden-sizes', type=int,
                         nargs='*', default=[128, 128])
     parser.add_argument('--imitation-hidden-sizes', type=int,
                         nargs='*', default=[128, 128])
-    parser.add_argument('--training-num', type=int, default=1)
-    parser.add_argument('--test-num', type=int, default=1)
+    parser.add_argument('--training-num', type=int, default=3)
+    parser.add_argument('--test-num', type=int, default=4)
     parser.add_argument('--logdir', type=str, default='log')
-    parser.add_argument('--render', type=float, default=0.)
+    parser.add_argument('--render', type=float, default=0.01)
     parser.add_argument('--rew-norm', action="store_true", default=False)
     parser.add_argument('--n-step', type=int, default=3)
     parser.add_argument(
@@ -131,43 +131,43 @@ def test_sac_with_il(args=get_args()):
         env = gym.make(args.task)
         policy.eval()
         collector = Collector(policy, env)
-        result = collector.collect(n_episode=1, render=args.render)
+        result = collector.collect(n_episode=5, render=args.render)
         rews, lens = result["rews"], result["lens"]
         print(f"Final reward: {rews.mean()}, length: {lens.mean()}")
 
     # here we define an imitation collector with a trivial policy
-    policy.eval()
-    if args.task == 'Pendulum-v0':
-        env.spec.reward_threshold = -300  # lower the goal
-    net = Actor(
-        Net(args.state_shape, hidden_sizes=args.imitation_hidden_sizes,
-            device=args.device),
-        args.action_shape, max_action=args.max_action, device=args.device
-    ).to(args.device)
-    optim = torch.optim.Adam(net.parameters(), lr=args.il_lr)
-    il_policy = ImitationPolicy(
-        net, optim, action_space=env.action_space,
-        action_scaling=True, action_bound_method="clip")
-    il_test_collector = Collector(
-        il_policy,
-        DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.test_num)])
-    )
-    train_collector.reset()
-    result = offpolicy_trainer(
-        il_policy, train_collector, il_test_collector, args.epoch,
-        args.il_step_per_epoch, args.step_per_collect, args.test_num,
-        args.batch_size, stop_fn=stop_fn, save_fn=save_fn, logger=logger)
-    assert stop_fn(result['best_reward'])
+    # policy.eval()
+    # if args.task == 'Pendulum-v0':
+    #     env.spec.reward_threshold = -300  # lower the goal
+    # net = Actor(
+    #     Net(args.state_shape, hidden_sizes=args.imitation_hidden_sizes,
+    #         device=args.device),
+    #     args.action_shape, max_action=args.max_action, device=args.device
+    # ).to(args.device)
+    # optim = torch.optim.Adam(net.parameters(), lr=args.il_lr)
+    # il_policy = ImitationPolicy(
+    #     net, optim, action_space=env.action_space,
+    #     action_scaling=True, action_bound_method="clip")
+    # il_test_collector = Collector(
+    #     il_policy,
+    #     DummyVectorEnv([lambda: gym.make(args.task) for _ in range(args.test_num)])
+    # )
+    # train_collector.reset()
+    # result = offpolicy_trainer(
+    #     il_policy, train_collector, il_test_collector, args.epoch,
+    #     args.il_step_per_epoch, args.step_per_collect, args.test_num,
+    #     args.batch_size, stop_fn=stop_fn, save_fn=save_fn, logger=logger)
+    # assert stop_fn(result['best_reward'])
 
-    if __name__ == '__main__':
-        pprint.pprint(result)
-        # Let's watch its performance!
-        env = gym.make(args.task)
-        il_policy.eval()
-        collector = Collector(il_policy, env)
-        result = collector.collect(n_episode=1, render=args.render)
-        rews, lens = result["rews"], result["lens"]
-        print(f"Final reward: {rews.mean()}, length: {lens.mean()}")
+    # if __name__ == '__main__':
+    #     pprint.pprint(result)
+    #     # Let's watch its performance!
+    #     env = gym.make(args.task)
+    #     il_policy.eval()
+    #     collector = Collector(il_policy, env)
+    #     result = collector.collect(n_episode=1, render=args.render)
+    #     rews, lens = result["rews"], result["lens"]
+    #     print(f"Final reward: {rews.mean()}, length: {lens.mean()}")
 
 
 if __name__ == '__main__':
