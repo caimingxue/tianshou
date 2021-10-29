@@ -156,7 +156,7 @@ class ActorProb(nn.Module):
         max_action: float = 1.0,
         device: Union[str, int, torch.device] = "cpu",
         unbounded: bool = False,
-        conditioned_sigma: bool = False,
+        conditioned_sigma: bool = True,
         preprocess_net_output_dim: Optional[int] = None,
     ) -> None:
         super().__init__()

@@ -105,7 +105,7 @@ def onpolicy_trainer(
                                episode_per_test, logger, env_step, reward_metric)
     best_epoch = start_epoch
     best_reward, best_reward_std = test_result["rew"], test_result["rew_std"]
-
+    print("!!!!! Start to Train !!!!!!")
     for epoch in range(1 + start_epoch, 1 + max_epoch):
         # train
         policy.train()

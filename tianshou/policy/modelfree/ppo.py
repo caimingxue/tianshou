@@ -111,6 +111,8 @@ class PPOPolicy(A2CPolicy):
                 if self._norm_adv:
                     mean, std = b.adv.mean(), b.adv.std()
                     b.adv = (b.adv - mean) / std  # per-batch norm
+                # a = dist.log_prob(b.act)
+                # b = b.logp_old
                 ratio = (dist.log_prob(b.act) - b.logp_old).exp().float()
                 ratio = ratio.reshape(ratio.size(0), -1).transpose(0, 1)
                 surr1 = ratio * b.adv

@@ -127,9 +127,11 @@ class SACPolicy(DDPGPolicy):
         else:
             action_scale = 1.0  # type: ignore
         squashed_action = torch.tanh(act)
+
         log_prob = log_prob - torch.log(
             action_scale * (1 - squashed_action.pow(2)) + self.__eps
         ).sum(-1, keepdim=True)
+
         return Batch(logits=logits, act=squashed_action,
                      state=h, dist=dist, log_prob=log_prob)
 

@@ -100,7 +100,7 @@ class BasicLogger(BaseLogger):
         writer: SummaryWriter,
         train_interval: int = 1,
         test_interval: int = 1,
-        update_interval: int = 1000,
+        update_interval: int = 1,#default 1000, no curves for loss
         save_interval: int = 1,
     ) -> None:
         super().__init__(writer)

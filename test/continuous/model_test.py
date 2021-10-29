@@ -14,26 +14,26 @@ from tianshou.utils.net.common import Net
 from tianshou.trainer import onpolicy_trainer
 from tianshou.data import Collector, VectorReplayBuffer
 from tianshou.utils.net.continuous import ActorProb, Critic
-from pybullet_envs.bullet.kuka_diverse_object_gym_env import KukaDiverseObjectEnv
 
+from pybullet_env.kuka_reach_env import KukaReachEnv
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--task', type=str, default='LunarLanderContinuous-v2')
+    parser.add_argument('--task', type=str, default='Pendulum-v0')
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--buffer-size', type=int, default=20000)
     parser.add_argument('--lr', type=float, default=1e-3)
-    parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--epoch', type=int, default=5)
-    parser.add_argument('--step-per-epoch', type=int, default=150000)
+    parser.add_argument('--gamma', type=float, default=0.95)
+    parser.add_argument('--epoch', type=int, default=100)
+    parser.add_argument('--step-per-epoch', type=int, default=1000)
     parser.add_argument('--episode-per-collect', type=int, default=16)
     parser.add_argument('--repeat-per-collect', type=int, default=2)
-    parser.add_argument('--batch-size', type=int, default=128)
+    parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--hidden-sizes', type=int, nargs='*', default=[64, 64])
-    parser.add_argument('--training-num', type=int, default=16)
-    parser.add_argument('--test-num', type=int, default=100)
+    parser.add_argument('--training-num', type=int, default=1)
+    parser.add_argument('--test-num', type=int, default=1)
     parser.add_argument('--logdir', type=str, default='log')
-    parser.add_argument('--render', type=float, default=0.001)
+    parser.add_argument('--render', type=float, default=0)
     parser.add_argument(
         '--device', type=str,
         default='cuda' if torch.cuda.is_available() else 'cpu')
@@ -48,26 +48,33 @@ def get_args():
     parser.add_argument('--value-clip', type=int, default=1)
     parser.add_argument('--norm-adv', type=int, default=1)
     parser.add_argument('--recompute-adv', type=int, default=0)
-    parser.add_argument('--resume', action="store_true")
+    parser.add_argument('--resume', action="store_true", default=True)
     parser.add_argument("--save-interval", type=int, default=4)
+    # modified this to satisfy the custom env
+    # parser.add_argument('--env', type=str, default=env)
+    parser.add_argument('--is_render', action="store_true", default=True)
+    parser.add_argument('--is_good_view', action="store_true", default=False)
     args = parser.parse_known_args()[0]
     return args
 
-
 def test_ppo(args=get_args()):
-    env = gym.make(args.task)
-    if args.task == 'LunarLanderContinuous-v2':
-        env.spec.reward_threshold = -10
+    #env = gym.make(args.task)
+    env = KukaReachEnv(is_render=args.is_render, is_good_view=args.is_good_view)
+    # if args.task == 'Pendulum-v0':
+    #     env.spec.reward_threshold = -250
+    # env.spec.reward_threshold = 10
+
+
     args.state_shape = env.observation_space.shape or env.observation_space.n
     args.action_shape = env.action_space.shape or env.action_space.n
     args.max_action = env.action_space.high[0]
     # you can also use tianshou.env.SubprocVectorEnv
     # train_envs = gym.make(args.task)
     train_envs = DummyVectorEnv(
-        [lambda: gym.make(args.task) for _ in range(args.training_num)])
+        [lambda: env for _ in range(args.training_num)])
     # test_envs = gym.make(args.task)
     test_envs = DummyVectorEnv(
-        [lambda: gym.make(args.task) for _ in range(args.test_num)])
+        [lambda: env for _ in range(args.test_num)])
     # seed
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -118,20 +125,6 @@ def test_ppo(args=get_args()):
     log_path = os.path.join(args.logdir, args.task, 'ppo')
     writer = SummaryWriter(log_path)
     logger = BasicLogger(writer, save_interval=args.save_interval)
-
-    def save_fn(policy):
-        torch.save(policy.state_dict(), os.path.join(log_path, 'policy.pth'))
-
-    def stop_fn(mean_rewards):
-        return mean_rewards >= env.spec.reward_threshold
-
-    def save_checkpoint_fn(epoch, env_step, gradient_step):
-        # see also: https://pytorch.org/tutorials/beginner/saving_loading_models.html
-        torch.save({
-            'model': policy.state_dict(),
-            'optim': optim.state_dict(),
-        }, os.path.join(log_path, 'checkpoint.pth'))
-
     if args.resume:
         # load from existing checkpoint
         print(f"Loading agent under {log_path}")
@@ -144,30 +137,11 @@ def test_ppo(args=get_args()):
         else:
             print("Fail to restore policy and optim.")
 
-    # trainer
-    result = onpolicy_trainer(
-        policy, train_collector, test_collector, args.epoch, args.step_per_epoch,
-        args.repeat_per_collect, args.test_num, args.batch_size,
-        episode_per_collect=args.episode_per_collect, stop_fn=stop_fn, save_fn=save_fn,
-        logger=logger, resume_from_log=args.resume,
-        save_checkpoint_fn=save_checkpoint_fn)
-    assert stop_fn(result['best_reward'])
-
-    if __name__ == '__main__':
-        pprint.pprint(result)
-        # Let's watch its performance!
-        env = gym.make(args.task)
-        policy.eval()
-        collector = Collector(policy, env)
-        result = collector.collect(n_episode=10, render=args.render)
-        rews, lens = result["rews"], result["lens"]
-        print(f"Final reward: {rews.mean()}, length: {lens.mean()}")
-
-
-def test_ppo_resume(args=get_args()):
-    args.resume = True
-    test_ppo(args)
-
+    policy.eval()
+    collector = Collector(policy, env)
+    result = collector.collect(n_episode=10, render=args.render)
+    rews, lens = result["rews"], result["lens"]
+    print(f"Final reward: {rews.mean()}, length: {lens.mean()}")
 
 if __name__ == '__main__':
     test_ppo()
